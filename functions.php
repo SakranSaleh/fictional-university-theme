@@ -1,19 +1,17 @@
 <?php
 
-require get_theme_file_path('inc/search-route.php');
-
+require get_theme_file_path('/inc/search-route.php');
 
 function university_custom_rest()
 {
     register_rest_field('post', 'authorName', array(
-        'get_callback' => function ($post) {
-            return get_the_author_meta('display_name', $post['author']);
+        'get_callback' => function () {
+            return get_the_author();
         }
     ));
 }
+
 add_action('rest_api_init', 'university_custom_rest');
-
-
 
 function pageBanner($args = [])
 {
@@ -50,55 +48,47 @@ function pageBanner($args = [])
 
 <?php }
 
-
-function university_file()
+function university_files()
 {
-    wp_enqueue_style("custom-google-font", "//fonts.googleapis.com/css?family=Roboto+Condensed:300,300i,400,400i,700,700i|Roboto:100,300,400,400i,700,700i");
-    wp_enqueue_style("font-awesome", "//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css");
-    wp_enqueue_style("university-main-style", get_theme_file_uri("/build/style-index.css"));
-    wp_enqueue_style("university-extra-style", get_theme_file_uri("/build/index.css"));
+    wp_enqueue_script('googleMap', '//maps.googleapis.com/maps/api/js?key=AIzaSyDin3iGCdZ7RPomFLyb2yqFERhs55dmfTI', NULL, '1.0', true);
+    wp_enqueue_script('main-university-js', get_theme_file_uri('/build/index.js'), array('jquery'), '1.0', true);
+    wp_enqueue_style('custom-google-fonts', '//fonts.googleapis.com/css?family=Roboto+Condensed:300,300i,400,400i,700,700i|Roboto:100,300,400,400i,700,700i');
+    wp_enqueue_style('font-awesome', '//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css');
+    wp_enqueue_style('university_main_styles', get_theme_file_uri('/build/style-index.css'));
+    wp_enqueue_style('university_extra_styles', get_theme_file_uri('/build/index.css'));
 
-
-
-    wp_enqueue_script("main-js", get_theme_file_uri('/build/index.js'), array("jquery"), "1.0", true);
-
-
-    wp_localize_script("main-js", "universityData", array(
-        "root_url" => site_url()
+    wp_localize_script('main-university-js', 'universityData', array(
+        'root_url' => get_site_url(),
+        'nonce' => wp_create_nonce('wp_rest')
     ));
 }
 
-add_action("wp_enqueue_scripts", "university_file");
-
+add_action('wp_enqueue_scripts', 'university_files');
 
 function university_features()
 {
-    // register_nav_menu("headerNavMenu", "Header Menu Location");
-    // register_nav_menu("footerLocationOne", "Footer Location One");
-    // register_nav_menu("footerLocationTwo", "Footer Location Two");
-    add_theme_support("title-tag");
+    add_theme_support('title-tag');
     add_theme_support('post-thumbnails');
-    add_image_size('professorLandScape', 400, 260, true);
-    add_image_size('professorPoitrait', 480, 650, true);
+    add_image_size('professorLandscape', 400, 260, true);
+    add_image_size('professorPortrait', 480, 650, true);
     add_image_size('pageBanner', 1500, 350, true);
 }
 
-add_action("after_setup_theme", "university_features");
+add_action('after_setup_theme', 'university_features');
 
-
-function university_adjust_quiries($query)
+function university_adjust_queries($query)
 {
-
-    if (!is_admin() && is_post_type_archive('campus') && $query->is_main_query()) {
+    if (!is_admin() and is_post_type_archive('campus') and $query->is_main_query()) {
         $query->set('posts_per_page', -1);
     }
-    if (!is_admin() && is_post_type_archive('program') && $query->is_main_query()) {
+
+    if (!is_admin() and is_post_type_archive('program') and $query->is_main_query()) {
         $query->set('orderby', 'title');
         $query->set('order', 'ASC');
         $query->set('posts_per_page', -1);
     }
 
-    if (!is_admin() && is_post_type_archive('event') && $query->is_main_query()) {
+    if (!is_admin() and is_post_type_archive('event') and $query->is_main_query()) {
         $today = date('Ymd');
         $query->set('meta_key', 'event_date');
         $query->set('orderby', 'meta_value_num');
@@ -114,19 +104,17 @@ function university_adjust_quiries($query)
     }
 }
 
-add_action('pre_get_posts', 'university_adjust_quiries');
-
+add_action('pre_get_posts', 'university_adjust_queries');
 
 function universityMapKey($api)
 {
-    $api['key'] = 'AIzaSyAOVYRIgupAurZup5y1PRh8Ismb1A3lLao';
+    $api['key'] = 'yourKeyGoesHere';
     return $api;
 }
 
-add_action('acf/fields/google_map/api', 'universityMapKey');
+add_filter('acf/fields/google_map/api', 'universityMapKey');
 
-
-
+// Redirect subscriber accounts out of admin and onto homepage
 add_action('admin_init', 'redirectSubsToFrontend');
 
 function redirectSubsToFrontend()
@@ -139,15 +127,61 @@ function redirectSubsToFrontend()
     }
 }
 
+add_action('wp_loaded', 'noSubsAdminBar');
 
-
-add_action('wp_loaded', 'noSubsAdminbar');
-
-function noSubsAdminbar()
+function noSubsAdminBar()
 {
     $ourCurrentUser = wp_get_current_user();
 
     if (count($ourCurrentUser->roles) == 1 and $ourCurrentUser->roles[0] == 'subscriber') {
         show_admin_bar(false);
     }
+}
+
+// Customize Login Screen
+add_filter('login_headerurl', 'ourHeaderUrl');
+
+function ourHeaderUrl()
+{
+    return esc_url(site_url('/'));
+}
+
+add_action('login_enqueue_scripts', 'ourLoginCSS');
+
+function ourLoginCSS()
+{
+    wp_enqueue_style('custom-google-fonts', '//fonts.googleapis.com/css?family=Roboto+Condensed:300,300i,400,400i,700,700i|Roboto:100,300,400,400i,700,700i');
+    wp_enqueue_style('font-awesome', '//maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css');
+    wp_enqueue_style('university_main_styles', get_theme_file_uri('/build/style-index.css'));
+    wp_enqueue_style('university_extra_styles', get_theme_file_uri('/build/index.css'));
+}
+
+add_filter('login_headertitle', 'ourLoginTitle');
+
+function ourLoginTitle()
+{
+    return get_bloginfo('name');
+}
+
+
+// Force note post to private
+
+add_filter('wp_insert_post_data', 'makeNotePrivate', 10, 2);
+
+function makeNotePrivate($data, $postarr)
+{
+    if ($data['post_type'] == 'note') {
+
+        if (count_user_posts(get_current_user_id(), 'note') > 4 and !$postarr['ID']) {
+            die('You have reached your post limit');
+        }
+
+        $data['post_content'] = sanitize_textarea_field($data['post_content']);
+        $data['post_title'] = sanitize_text_field($data['post_title']);
+    }
+
+    if ($data['post_type'] == 'note' && $data['post_status'] != 'trash') {
+        $data['post_status'] = 'private';
+    }
+    return $data;
 }
